@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Piano Master">
+    
+    <link rel="apple-touch-icon" href="assets/icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    
+    <title>Piano Master | Offline PWA</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ios-install-prompt" class="hidden">
+        To install, tap <strong>Share</strong> <span class="share-icon">↑</span><br> and select <strong>Add to Home Screen</strong>.
+        <button id="close-prompt">✖</button>
+    </div>
+
+    <div id="ui-layer">
+        <!-- Main Menu -->
+        <div id="main-menu" class="panel">
+            <h1>Piano Master</h1>
+            
+            <div id="song-list">
+                <!-- Built-in songs injected here -->
+            </div>
+
+            <div class="divider">MY SAVED SONGS</div>
+            <div id="saved-songs-list">
+                <!-- IndexedDB saved offline songs injected here -->
+            </div>
+
+            <div class="divider">ADD NEW TRACK</div>
+            <div id="upload-zone">
+                <p>Upload MP3 (Saves Offline)</p>
+                <label for="customAudio" class="upload-btn">Browse Files</label>
+                <input type="file" id="customAudio" accept="audio/*">
+            </div>
+            <div id="loading-text" class="hidden">Analyzing & Saving...</div>
+        </div>
+
+        <div id="hud" class="hidden">
+            <div id="score">Score: 0</div>
+            <div id="combo">Combo: x0</div>
+        </div>
+
+        <div id="game-over" class="panel hidden">
+            <h2>Game Over</h2>
+            <p id="final-score">Score: 0</p>
+            <p id="max-combo">Max Combo: x0</p>
+            <button id="restart-btn" class="btn">Back to Menu</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('SW Registered'))
+                    .catch(err => console.error('SW Failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>
