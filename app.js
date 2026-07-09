@@ -1,6 +1,6 @@
 /**
- * PIANO MASTER - Core Game Engine
- * Features: Web Audio API, IndexedDB Offline Storage, Beat Detection
+ * PIANO MASTER - Cross-Platform Engine
+ * Features: Touch & Mouse Input, IndexedDB, Responsive Canvas
  */
 
 // --- 1. CONFIGURATION & STATE ---
@@ -9,19 +9,24 @@ let currentState = GAME_STATE.MENU;
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-let width = canvas.width = window.innerWidth;
-let height = canvas.height = window.innerHeight;
+let width, height, laneWidth, hitLineY, baseSpeed;
+
+// Responsive sizing initialization
+function resizeCanvas() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    laneWidth = width / 4; // 4 Lanes
+    hitLineY = height * 0.85; // Target line near the bottom
+    baseSpeed = height * 0.7; // Tiles move 70% of screen height per second
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas(); // Set initially
 
 const LANES = 4;
-let laneWidth = width / LANES;
-let hitLineY = height * 0.8; 
-let baseSpeed = height * 0.7; 
 let speedMultiplier = 1.0; 
-
 let score = 0, combo = 0, maxCombo = 0;
 let tiles = [], particles = [];
 let shakeTime = 0, redFlashAlpha = 0;
-
 let audioCtx, currentSource, audioStartTime = 0;
 
 const uiMenu = document.getElementById('main-menu');
@@ -29,9 +34,9 @@ const uiHud = document.getElementById('hud');
 const uiGameOver = document.getElementById('game-over');
 const loadingText = document.getElementById('loading-text');
 
-// Built-in Track (Will be cached by SW)
+// Built-in Track Demo (Offline Cacheable)
 const builtInSongs = [
-    { title: "Default Track", url: "audio/default.mp3", timestamps: [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0] } // Replace timestamps with actual beats if you map them manually
+    { title: "Demo Track (Click to Test)", url: "audio/default.mp3", timestamps: [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0] } 
 ];
 
 // --- 2. INDEXED DB (OFFLINE STORAGE FOR UPLOADS) ---
@@ -108,20 +113,26 @@ class Tile {
     constructor(timestamp) {
         this.timestamp = timestamp; 
         this.lane = Math.floor(Math.random() * LANES);
-        this.width = laneWidth * 0.9;
+        
+        // Dynamic sizing based on screen width for Laptop/iPad compatibility
+        let maxTileWidth = Math.min(laneWidth * 0.9, 150); // Don't let tiles get too huge on ultrawide monitors
+        this.width = maxTileWidth;
         this.height = height * 0.15;
         this.active = true;
-        this.x = this.lane * laneWidth + (laneWidth * 0.05);
+        
+        // Center the tile inside its lane
+        this.x = (this.lane * laneWidth) + (laneWidth / 2) - (this.width / 2);
         this.y = -this.height;
     }
     draw(currentTime) {
         if (!this.active) return;
         const timeToHit = this.timestamp - currentTime;
         this.y = hitLineY - (timeToHit * baseSpeed);
+        
         if (this.y > -this.height && this.y < height) {
             ctx.fillStyle = '#3498db';
             ctx.beginPath();
-            ctx.roundRect(this.x, this.y, this.width, this.height, 8);
+            ctx.roundRect(this.x, this.y, this.width, this.height, 12);
             ctx.fill();
         }
         if (this.y > height && this.active) {
@@ -134,18 +145,18 @@ class Tile {
 class Particle {
     constructor(x, y, color) {
         this.x = x; this.y = y;
-        this.vx = (Math.random() - 0.5) * 10;
-        this.vy = (Math.random() - 0.5) * 10;
+        this.vx = (Math.random() - 0.5) * 12;
+        this.vy = (Math.random() - 0.5) * 12;
         this.life = 1.0;
         this.color = color;
     }
     update() {
         this.x += this.vx; this.y += this.vy;
-        this.life -= 0.05;
+        this.life -= 0.04;
         ctx.globalAlpha = Math.max(this.life, 0);
         ctx.fillStyle = this.color;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1.0;
     }
@@ -171,8 +182,8 @@ async function startGame(audioBuffer, timestamps) {
     currentState = GAME_STATE.PLAYING;
     audioStartTime = audioCtx.currentTime;
     
-    currentSource.start(audioCtx.currentTime + 1);
-    audioStartTime += 1; 
+    currentSource.start(audioCtx.currentTime + 1.5); // 1.5s delay to get ready
+    audioStartTime += 1.5; 
 
     currentSource.onended = () => {
         if (currentState === GAME_STATE.PLAYING) endGame();
@@ -180,7 +191,14 @@ async function startGame(audioBuffer, timestamps) {
     gameLoop();
 }
 
-function handleHit(lane) {
+function processInput(clientX) {
+    if (currentState !== GAME_STATE.PLAYING) return;
+    
+    // Determine which lane was clicked/tapped
+    let lane = Math.floor(clientX / laneWidth);
+    if (lane < 0) lane = 0;
+    if (lane > LANES - 1) lane = LANES - 1;
+
     let trackTime = audioCtx.currentTime - audioStartTime;
     let targetTile = null, minDiff = Infinity;
 
@@ -191,17 +209,20 @@ function handleHit(lane) {
         }
     }
 
+    // Tolerance window for hitting a tile (0.3 seconds)
     if (targetTile && minDiff < 0.3) {
         targetTile.active = false;
         score += 10 + (combo * 2);
         combo++;
         if (combo > maxCombo) maxCombo = combo;
         
-        for(let i=0; i<15; i++) {
+        // Spawn Particles
+        for(let i=0; i<20; i++) {
             particles.push(new Particle(targetTile.x + targetTile.width/2, hitLineY, '#2ecc71'));
         }
 
-        if (combo % 10 === 0 && speedMultiplier < 1.5) {
+        // Speed up game progressively
+        if (combo % 15 === 0 && speedMultiplier < 1.6) {
             speedMultiplier += 0.05;
             currentSource.playbackRate.setValueAtTime(speedMultiplier, audioCtx.currentTime);
         }
@@ -219,7 +240,10 @@ function triggerMiss() {
 
 function endGame() {
     currentState = GAME_STATE.GAMEOVER;
-    if (currentSource) { currentSource.stop(); currentSource.disconnect(); }
+    if (currentSource) { 
+        try { currentSource.stop(); } catch(e){} 
+        currentSource.disconnect(); 
+    }
     uiHud.classList.add('hidden');
     uiGameOver.classList.remove('hidden');
     document.getElementById('final-score').innerText = `Score: ${score}`;
@@ -235,23 +259,36 @@ function updateHUD() {
 function gameLoop() {
     if (currentState !== GAME_STATE.PLAYING) return;
     ctx.save();
+    
+    // Screen Shake effect
     if (shakeTime > 0) {
         ctx.translate((Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20);
         shakeTime--;
     }
 
-    ctx.fillStyle = '#121212';
+    // Clear Canvas
+    ctx.fillStyle = '#0f0f13';
     ctx.fillRect(0, 0, width, height);
 
-    ctx.strokeStyle = '#333';
+    // Draw Lane Dividers
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 2;
     for (let i = 1; i < LANES; i++) {
-        ctx.beginPath(); ctx.moveTo(i * laneWidth, 0); ctx.lineTo(i * laneWidth, height); ctx.stroke();
+        ctx.beginPath(); 
+        ctx.moveTo(i * laneWidth, 0); 
+        ctx.lineTo(i * laneWidth, height); 
+        ctx.stroke();
     }
 
-    ctx.strokeStyle = '#2ecc71';
-    ctx.beginPath(); ctx.moveTo(0, hitLineY); ctx.lineTo(width, hitLineY); ctx.stroke();
+    // Draw Hit Target Line
+    ctx.strokeStyle = 'rgba(46, 204, 113, 0.5)';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); 
+    ctx.moveTo(0, hitLineY); 
+    ctx.lineTo(width, hitLineY); 
+    ctx.stroke();
 
+    // Draw Tiles & Particles
     let trackTime = audioCtx.currentTime - audioStartTime;
     tiles.forEach(t => t.draw(trackTime));
 
@@ -261,39 +298,39 @@ function gameLoop() {
     }
     ctx.restore();
 
+    // Draw Red Flash on Miss
     if (redFlashAlpha > 0) {
-        ctx.fillStyle = `rgba(255, 0, 0, ${redFlashAlpha})`;
+        ctx.fillStyle = `rgba(231, 76, 60, ${redFlashAlpha})`;
         ctx.fillRect(0, 0, width, height);
         redFlashAlpha -= 0.02;
     }
     requestAnimationFrame(gameLoop);
 }
 
-// --- 6. INPUTS & INITIALIZATION ---
+// --- 6. INPUTS & CROSS-PLATFORM SUPPORT ---
+
+// Mobile & iPad Touch Input
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (currentState !== GAME_STATE.PLAYING) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
-        handleHit(Math.floor(e.changedTouches[i].clientX / laneWidth));
+        processInput(e.changedTouches[i].clientX);
     }
 }, { passive: false });
 
-window.addEventListener('resize', () => {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
-    laneWidth = width / LANES;
-    hitLineY = height * 0.8;
-    baseSpeed = height * 0.7;
+// Desktop & Laptop Mouse Input
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; // Only accept Left Click
+    processInput(e.clientX);
 });
 
-// Populate Menus
+// --- 7. UI INITIALIZATION ---
 async function populateUI() {
     const list = document.getElementById('song-list');
     list.innerHTML = '';
     builtInSongs.forEach(song => {
         let btn = document.createElement('button');
         btn.className = 'song-btn';
-        btn.innerText = song.title;
+        btn.innerText = `▶ ${song.title}`;
         btn.onclick = async () => {
             initAudio(); loadingText.classList.remove('hidden');
             try {
@@ -302,18 +339,17 @@ async function populateUI() {
                 const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
                 loadingText.classList.add('hidden');
                 startGame(audioBuffer, song.timestamps);
-            } catch (err) { alert("Error loading track. Are you offline?"); loadingText.classList.add('hidden'); }
+            } catch (err) { alert("Error loading track. (Make sure you put an mp3 file in the audio/ folder)"); loadingText.classList.add('hidden'); }
         };
         list.appendChild(btn);
     });
 
-    // Populate IndexedDB Custom Songs
     const savedList = document.getElementById('saved-songs-list');
     savedList.innerHTML = '';
     const savedSongs = await getSavedSongs();
     
     if (savedSongs.length === 0) {
-        savedList.innerHTML = '<span style="color:#888;font-size:0.9rem;">No custom songs saved yet.</span>';
+        savedList.innerHTML = '<span style="color:#888;font-size:0.95rem;">No custom songs saved yet.</span>';
     } else {
         savedSongs.forEach(song => {
             let btn = document.createElement('button');
@@ -322,7 +358,7 @@ async function populateUI() {
             btn.onclick = async () => {
                 initAudio(); loadingText.classList.remove('hidden');
                 try {
-                    const audioBuffer = await audioCtx.decodeAudioData(song.audioData.slice(0)); // Copy buffer
+                    const audioBuffer = await audioCtx.decodeAudioData(song.audioData.slice(0)); 
                     loadingText.classList.add('hidden');
                     startGame(audioBuffer, song.timestamps);
                 } catch (err) { alert("Error loading saved track."); loadingText.classList.add('hidden'); }
@@ -332,10 +368,9 @@ async function populateUI() {
     }
 }
 
-// Setup System
 initDB().then(populateUI).catch(console.error);
 
-// Custom Upload Handling -> Analyzes, Saves to DB, then Plays
+// Custom File Upload
 document.getElementById('customAudio').addEventListener('change', function(e) {
     if (e.target.files.length === 0) return;
     initAudio();
@@ -347,17 +382,15 @@ document.getElementById('customAudio').addEventListener('change', function(e) {
     reader.onload = async function(ev) {
         try {
             const arrayBuffer = ev.target.result;
-            // Decode a copy so we can keep the original ArrayBuffer to save in DB
             const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0)); 
-            
             const generatedTimestamps = await analyzeAudioBeats(audioBuffer);
             
-            // Save completely offline in IndexedDB
+            // Save to database & refresh UI
             await saveCustomSong(file.name.replace(/\.[^/.]+$/, ""), arrayBuffer, generatedTimestamps);
             
             loadingText.classList.add('hidden');
-            populateUI(); // Refresh UI to show the newly saved track
-            startGame(audioBuffer, generatedTimestamps); // Start immediately
+            populateUI();
+            startGame(audioBuffer, generatedTimestamps);
         } catch (err) {
             alert("Could not process audio file.");
             loadingText.classList.add('hidden');
@@ -372,7 +405,7 @@ document.getElementById('restart-btn').addEventListener('click', () => {
     currentState = GAME_STATE.MENU;
 });
 
-// iOS PWA Install Prompt
+// iOS Install Prompt Check
 if (/iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()) && !('standalone' in window.navigator && window.navigator.standalone)) {
     const prompt = document.getElementById('ios-install-prompt');
     prompt.classList.remove('hidden');
