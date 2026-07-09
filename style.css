@@ -1,0 +1,190 @@
+:root {
+    --bg-color: #0f0f13;
+    --primary: #3498db;
+    --primary-hover: #2980b9;
+    --danger: #e74c3c;
+    --success: #2ecc71;
+    --text-main: #ffffff;
+    --text-muted: #888888;
+    --panel-bg: rgba(25, 25, 30, 0.85);
+}
+
+/* Base Reset & Anti-Mobile Delay */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    touch-action: manipulation; 
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-color);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text-main);
+}
+
+/* Fullscreen Canvas */
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+/* UI Overlay Layer */
+#ui-layer {
+    position: absolute;
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+    z-index: 10;
+    pointer-events: none; /* Allows clicks to pass through to canvas when playing */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Panels (Menus) */
+.panel {
+    background: var(--panel-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 2.5rem;
+    border-radius: 24px;
+    text-align: center;
+    pointer-events: auto; /* Re-enable clicks for UI */
+    box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    width: 90%;
+    max-width: 450px; /* Looks good on laptops and iPads */
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Typography */
+h1 { margin-bottom: 0.5rem; font-weight: 800; font-size: 2.2rem; letter-spacing: 1px; }
+h2 { color: var(--danger); font-size: 2.5rem; margin-bottom: 1rem; }
+
+/* Lists & Buttons */
+#song-list, #saved-songs-list { 
+    margin-top: 1rem; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 0.8rem; 
+}
+
+.song-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: white; 
+    padding: 1.2rem; 
+    border-radius: 12px;
+    font-size: 1.1rem; 
+    font-weight: 600;
+    cursor: pointer; 
+    transition: all 0.2s ease;
+}
+
+.song-btn:hover { background: rgba(255, 255, 255, 0.15); }
+.song-btn:active { background: var(--primary); transform: scale(0.97); }
+
+.divider { 
+    margin: 1.5rem 0 1rem 0; 
+    color: var(--text-muted); 
+    font-size: 0.85rem; 
+    font-weight: 800; 
+    letter-spacing: 2px;
+}
+
+/* Custom Upload Zone */
+#upload-zone {
+    border: 2px dashed rgba(255,255,255,0.2);
+    padding: 1.5rem; 
+    border-radius: 16px;
+    background: rgba(0,0,0,0.2);
+}
+
+#upload-zone p { 
+    margin-bottom: 1rem; 
+    font-size: 0.95rem; 
+    color: var(--text-muted); 
+}
+
+/* HIDE DEFAULT UGLY FILE INPUT */
+input[type="file"] { 
+    display: none !important; 
+}
+
+/* Stylized Buttons */
+.upload-btn, .btn {
+    display: inline-block; 
+    background: var(--primary);
+    color: white; 
+    padding: 1rem 2rem; 
+    border-radius: 30px;
+    font-weight: 700; 
+    cursor: pointer; 
+    text-transform: uppercase;
+    font-size: 1rem; 
+    border: none; 
+    outline: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+}
+
+.upload-btn:hover, .btn:hover { background: var(--primary-hover); transform: translateY(-2px); }
+.upload-btn:active, .btn:active { transform: translateY(1px) scale(0.95); box-shadow: none; }
+
+/* Heads Up Display (HUD) */
+#hud {
+    position: absolute; 
+    top: env(safe-area-inset-top, 30px); 
+    left: 30px; 
+    right: 30px;
+    display: flex; 
+    justify-content: space-between; 
+    font-size: 1.5rem;
+    font-weight: 800; 
+    color: white; 
+    text-shadow: 0 4px 6px rgba(0,0,0,0.9);
+}
+
+/* Loading Text */
+#loading-text {
+    margin-top: 15px;
+    color: var(--success);
+    font-weight: bold;
+    animation: pulse 1s infinite alternate;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* iOS Prompt */
+#ios-install-prompt {
+    position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.95); color: #000;
+    padding: 15px 20px; border-radius: 12px; font-size: 0.9rem; text-align: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 100; pointer-events: auto;
+    width: 90%; max-width: 350px;
+}
+#close-prompt {
+    position: absolute; top: 5px; right: 8px; background: none;
+    border: none; font-size: 1.2rem; cursor: pointer; color: #666;
+}
+
+/* CRITICAL: Hides screens that aren't active */
+.hidden { display: none !important; }
